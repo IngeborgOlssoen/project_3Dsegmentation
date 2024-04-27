@@ -23,27 +23,71 @@ from monai.transforms import Transform
 import vtk
 from vtk.util.numpy_support import vtk_to_numpy
 
+import numpy as np
+from monai.transforms import Transform
+
+class LoadNumpyd(Transform):
+    """
+    Load .npy files and add them to the data dictionary under specified keys.
+    """
+    def __init__(self, keys):
+        super().__init__()
+        self.keys = keys
+
+    def __call__(self, data):
+        d = dict(data)
+        for key in self.keys:
+            d[key] = np.load(d[key])
+        return d
+
+
+class LoadVTKd(Transform):
+    """
+    A custom transform to load VTK files and convert them to numpy arrays.
+    """
+    def __init__(self, keys):
+        super().__init__()
+        self.keys = keys
+
+    def __call__(self, data):
+        d = dict(data)
+        for key in self.keys:
+            reader = vtk.vtkXMLPolyDataReader()
+            reader.SetFileName(d[key])
+            reader.Update()
+            vtk_data = reader.GetOutput()
+            points = vtk_data.GetPoints()
+            array = vtk_to_numpy(points.GetData())
+            d[key] = array
+        return d
+
+
+from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, CastToTyped, ScaleIntensityRanged, RandCropByPosNegLabeld, RandRotate90d, RandFlipd, ToTensord
 
 train_transforms = Compose([
-    LoadImaged(keys=["image", "label"]),
-    LoadImaged(dist),
-    EnsureChannelFirstd(keys=["image", "label"]),
-    CastToTyped(keys=["image", "label"], dtype=(torch.float32, torch.float32)),
-    ScaleIntensityRanged(keys=["image"], a_min=0, a_max=1000, b_min=0, b_max=1, clip=True),
-    RandCropByPosNegLabeld(keys=["image", "label"], label_key="label", spatial_size=(96, 96, 96), pos=8, neg=1, num_samples=4),
-    ToTensord(keys=["image", "label", "centerline", "surface_mesh"])
+    LoadImaged(keys=["image", "label"]),  # Load NRRD files
+    LoadNumpyd(keys=["distance_map"]),  # Load NPY distance map files using the custom transform
+    LoadVTKd(keys=["centerline"]),  # Load VTP files, using the custom VTK transform
+    EnsureChannelFirstd(keys=["image", "label", "distance_map"]),
+    CastToTyped(keys=["image", "label", "distance_map", "centerline"], dtype=(torch.float32, torch.float32, torch.float32, torch.float32)),
+    ScaleIntensityRanged(keys=["image", "distance_map"], a_min=0, a_max=1000, b_min=0, b_max=1, clip=True),
+    RandCropByPosNegLabeld(keys=["image", "label"], label_key="label", spatial_size=(96, 96, 96), pos=1, neg=1, num_samples=4),
+    RandRotate90d(keys=["image", "label", "distance_map"], prob=0.2),
+    RandFlipd(keys=["image", "label", "distance_map"], prob=0.5),
+    ToTensord(keys=["image", "label", "distance_map", "centerline", "surface_mesh"])
 ])
-
-
 
 validate_transforms = Compose([
-    LoadImaged(keys=["image", "label", "center_lines", "surfacemeshes"]),
-    EnsureChannelFirstd(keys=["image", "label"]),  # Apply channel-first only to images and labels
-    CastToTyped(keys=["image", "label"], dtype=(torch.float32, torch.float32)),
-    ScaleIntensityRanged(keys=["image"], a_min=0, a_max=1000, b_min=0, b_max=1, clip=True),
-    Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
-    ToTensord(keys=["image", "label", "center_lines", "surfacemeshes"])  # Convert all to tensor
+    LoadImaged(keys=["image", "label"]),
+    LoadNumpyd(keys=["distance_map"]),
+    LoadVTKd(keys=["centerline"]),
+    EnsureChannelFirstd(keys=["image", "label", "distance_map"]),
+    CastToTyped(keys=["image", "label", "distance_map", "centerline"], dtype=(torch.float32, torch.float32, torch.float32, torch.float32)),
+    ScaleIntensityRanged(keys=["image", "distance_map"], a_min=0, a_max=1000, b_min=0, b_max=1, clip=True),
+    Spacingd(keys=["image", "label", "distance_map"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
+    ToTensord(keys=["image", "label", "distance_map", "centerline", "surface_mesh"])
 ])
+
 
 model_inference= SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=1, overlap=0.5)
 
