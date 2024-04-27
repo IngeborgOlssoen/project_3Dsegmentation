@@ -64,4 +64,10 @@ stl_directory = '/datasets/tdt4265/mic/asoca/Diseased/SurfaceMeshes'
 nrrd_directory = '/datasets/tdt4265/mic/asoca/Diseased/CTCA'
 output_directory = '/work/ingesols/project_3Dsegmentation/distance_maps'
 
+stl_directory_normal= '/datasets/tdt4265/mic/asoca/Normal/SurfaceMeshes'
+nrrd_directory_normal = '/datasets/tdt4265/mic/asoca/Normal/CTCA'
+output_directory_normal = '/work/ingesols/project_3Dsegmentation/distance_maps'
+
 process_all_files(stl_directory, nrrd_directory, output_directory)
+
+process_all_files(stl_directory_normal,nrrd_directory_normal,output_directory)
