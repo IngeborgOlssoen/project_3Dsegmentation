@@ -15,7 +15,7 @@ print(f"Training on device: {device}")
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-epochs = 30
+epochs = 50
 optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 # Define scheduler
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
@@ -60,7 +60,7 @@ for epoch in range(epochs):
         # Forward pass
         
         outputs = model(images)
-        """
+        
         loss = loss_func(outputs, labels)/accumulation_steps
 
         # Backward pass and optimize
@@ -69,15 +69,14 @@ for epoch in range(epochs):
             optimizer.step()  # Update parameters only after accumulation steps
             optimizer.zero_grad()  # Clear gradients after updating
 
-        epoch_loss += loss.item()  # Correct loss scaling
+        epoch_loss += loss.item()*accumulation_steps  # Correct loss scaling
 
-        """
-        loss = loss_func(outputs, labels)
+        #loss = loss_func(outputs, labels)
 
         # Backward pass and optimize
-        loss.backward()
-        optimizer.step()  # Update parameters only after accumulation steps
-        optimizer.zero_grad()  # Clear gradients after updating
+        #loss.backward()
+        #optimizer.step()  # Update parameters only after accumulation steps
+        #optimizer.zero_grad()  # Clear gradients after updating
 
         epoch_loss += loss.item()  # Correct loss scaling
 

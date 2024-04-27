@@ -17,9 +17,9 @@ model = UNet(
     in_channels=1,
     out_channels=1,
     channels=(16, 32, 64, 128, 256),
-    strides=(2, 2, 2, 2),
-    num_res_units=2,
-    norm='BATCH'  # Assume you have batch normalization as per your earlier setup
+    strides=(2, 2, 2, 2), #2,2,2,2
+    num_res_units=2, #2
+    norm='INSTANCE'  # Assume you have batch normalization as per your earlier setup
 )
 
 # Move model to GPU

@@ -14,45 +14,35 @@ from monai.inferers.inferer import SlidingWindowInferer
 import torch
 import numpy as np
 
-from monai.transforms import Transform
 from monai.transforms import (
-    Compose, LoadImaged, ScaleIntensityd, 
-    RandRotate90d, RandFlipd, RandScaleIntensityd, RandShiftIntensityd,
-    ToTensord, RandAffined, ResizeWithPadOrCropd, ScaleIntensityRanged, Spacingd, RandCropByPosNegLabeld
+    Compose, LoadImaged, EnsureChannelFirstd, CastToTyped, ResizeWithPadOrCropd,
+    ScaleIntensityRanged, Spacingd, RandCropByPosNegLabeld, RandRotate90d,
+    RandFlipd, RandShiftIntensityd, ToTensord
 )
+from monai.transforms import Transform
+import vtk
+from vtk.util.numpy_support import vtk_to_numpy
+
 
 train_transforms = Compose([
     LoadImaged(keys=["image", "label"]),
-    EnsureChannelFirstd(keys=["image", "label"], channel_dim=None),  # Ensure channel is first, modifying if necessary
-    CastToTyped(keys=["image", "label"], dtype=(torch.float32, torch.float32)),  # Cast data to float32
-    #ResizeWithPadOrCropd(spatial_size=(512, 512, 224), keys=["image", "label"]),
-    ScaleIntensityRanged(keys=["image"], a_min=0,a_max=1000,b_min=0,b_max=1,clip=True),
-    Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
-    RandCropByPosNegLabeld(keys=["image", "label"], label_key="label", spatial_size=(96, 96, 96), pos=1, neg=1, num_samples=4),
-    #ResizeWithPadOrCropd(spatial_size=(96, 96, 96), keys=["image", "label"]),
-    #RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 2]),
-    #RandFlipd(keys=["image", "label"], spatial_axis=0, prob=0.5),
-    #RandScaleIntensityd(keys=["image"], factors=0.1, prob=0.5),
-    #RandShiftIntensityd(keys=["image"], offsets=0.1, prob=0.5),
-    #RandAffined(keys=["image", "label"], prob=0.5, spatial_size=(512, 512, 224), rotate_range=(0, 0, np.pi/15), scale_range=(0.1, 0.1, 0.1), mode=("bilinear", "nearest")),
-    ToTensord(keys=["image", "label"])
+    LoadImaged(dist),
+    EnsureChannelFirstd(keys=["image", "label"]),
+    CastToTyped(keys=["image", "label"], dtype=(torch.float32, torch.float32)),
+    ScaleIntensityRanged(keys=["image"], a_min=0, a_max=1000, b_min=0, b_max=1, clip=True),
+    RandCropByPosNegLabeld(keys=["image", "label"], label_key="label", spatial_size=(96, 96, 96), pos=8, neg=1, num_samples=4),
+    ToTensord(keys=["image", "label", "centerline", "surface_mesh"])
 ])
 
+
+
 validate_transforms = Compose([
-    LoadImaged(keys=["image", "label"]),
-    EnsureChannelFirstd(keys=["image", "label"]),  # Ensure channel is first, modifying if necessary
-    CastToTyped(keys=["image", "label"], dtype=(torch.float32, torch.float32)),  # Cast data to float32
-    #ResizeWithPadOrCropd(spatial_size=(512, 512, 224), keys=["image", "label"]),
-    ScaleIntensityRanged(keys=["image"], a_min=0,a_max=1000,b_min=0,b_max=1,clip=True),
+    LoadImaged(keys=["image", "label", "center_lines", "surfacemeshes"]),
+    EnsureChannelFirstd(keys=["image", "label"]),  # Apply channel-first only to images and labels
+    CastToTyped(keys=["image", "label"], dtype=(torch.float32, torch.float32)),
+    ScaleIntensityRanged(keys=["image"], a_min=0, a_max=1000, b_min=0, b_max=1, clip=True),
     Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
-    #ResizeWithPadOrCropd(spatial_size=(96, 96, 96), keys=["image", "label"]),
-    #RandCropByPosNegLabeld(keys=["image", "label"], label_key="label", spatial_size=(96, 96, 96), pos=1, neg=1, num_samples=4),
-    #RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 2]),
-    #RandFlipd(keys=["image", "label"], spatial_axis=0, prob=0.5),
-    #RandScaleIntensityd(keys=["image"], factors=0.1, prob=0.5),
-    #RandShiftIntensityd(keys=["image"], offsets=0.1, prob=0.5),
-    #RandAffined(keys=["image", "label"], prob=0.5, spatial_size=(512, 512, 224), rotate_range=(0, 0, np.pi/15), scale_range=(0.1, 0.1, 0.1), mode=("bilinear", "nearest")),
-    ToTensord(keys=["image", "label"])
+    ToTensord(keys=["image", "label", "center_lines", "surfacemeshes"])  # Convert all to tensor
 ])
 
 model_inference= SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=1, overlap=0.5)
@@ -65,7 +55,7 @@ train_ds = Dataset(data=train_pairs, transform=train_transforms)
 validate_ds = Dataset(data=validate_pairs, transform=validate_transforms)
 test_ds = Dataset(data=test_pairs, transform=train_transforms)
 
-train_loader = DataLoader(train_ds, batch_size=4, shuffle=True, num_workers=4,pin_memory=True)
+train_loader = DataLoader(train_ds, batch_size=6, shuffle=True, num_workers=4,pin_memory=True)
 validate_loader = DataLoader(validate_ds, batch_size=1, shuffle=True,num_workers=4,pin_memory=True)
 test_loader = DataLoader(test_ds, batch_size=4, shuffle=True, num_workers=4, pin_memory=True)
 
